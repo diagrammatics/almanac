@@ -1,7 +1,7 @@
 # almanac
 a searchable, sortable task manager contained in a single self-contained HTML file
 
-!["Cannot all you lecturers see, that it is we that are dying, and that down here the only thing that really lives is the Machine?"](https://media.giphy.com/media/vFKqnCdLPNOKc/giphy.gif)
+!["Cannot all you lecturers see, that it is we that are dying, and that down here the only thing that really lives is the Machine?"](https://media.tone.support/images/repos/almanac.gif)
 
 ## problem/note from the editor
 
