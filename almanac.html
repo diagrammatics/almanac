@@ -1,0 +1,642 @@
+<head>
+<meta charset="UTF-8">
+<style>
+body {
+  font-family: Karla, sans-serif;
+  background-color: #f5f3ef;
+  width: 100%;
+}
+
+table {
+  width: calc(100% - 4em);
+  border-collapse: collapse;
+  table-layout: fixed;
+  margin: 0 2em;
+}
+
+th, td {
+  border: 1px solid black;
+  font-size: 20px;
+  padding: 8px;
+  text-align: left;
+  word-wrap: break-word;
+  position: relative; /* Added for positioning sort indicators */
+}
+
+.sort-indicator {
+  position: absolute;
+  right: 8px; /* Adjust as needed */
+  top: 50%;
+  transform: translateY(-50%);
+  user-select: none; /* Prevents text selection */
+}
+
+th {
+  cursor: pointer;
+}
+
+th span {
+  margin-left: 4px;
+}
+
+#search {
+  width: 15%;
+  margin-bottom: 12px;
+  padding: 6px 12px;
+  border: 1px solid black;
+  border-radius: 0;
+  font-size: 14px;
+}
+
+#search-container.no-results::before {
+  content: "❗️";
+  color: red;
+  font-size: 16px;
+  font-weight: bold;
+  position: absolute;
+  left: 5px;
+  top: 50%;
+  transform: translateY(-80%);
+}
+
+
+.done {
+  background-color: #c0c0c088;
+}
+
+.done td {
+  color: #888888;
+  font-weight: bold;
+}
+
+.now {
+  background-color: #ace896bb;
+}
+
+.now td {
+  font-weight: bold;
+}
+
+.today {
+  background-color: #68c6f266;
+}
+
+.later {
+  background-color: #c696e866;
+}
+
+.urgent {
+  background-color: #f2786888;
+}
+
+.urgent td {
+  font-weight: bold;
+  font-size: bigger;
+}
+
+.remove-btn {
+  color: red;
+  cursor: pointer;
+  font-size: 24px;
+  font-weight: bold;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.button-container {
+  display: inline-block;
+  margin-left: 1em;
+}
+
+.button-container button {
+  padding: 6px 12px;
+  border: 1px solid black;
+  border-radius: 5px;
+  background-color: white;
+  color: black;
+  font-size: 14px;
+  font-family: Karla, sans-serif;
+  cursor: pointer;
+  margin-right: 1em;
+}
+
+th:last-child,
+td:last-child {
+  width: 30px;
+}
+
+th:nth-last-child(2),
+td:nth-last-child(2) {
+  width: calc(100% - 30px - 55%);
+}
+</style>
+</head>
+
+<div style="margin-left: 2em; position: relative;">
+  <div id="search-container" style="position: relative; display: inline-block;">
+    <input type="text" id="search" placeholder="search..." style="font-family: Karla, sans-serif; padding-left: 15px; width: 300px;">
+  </div>
+  <div class="button-container">
+    <button onclick="addRow()">add</button>
+    <button onclick="saveHtml()">save</button>
+    <button onclick="exportToCsv()">export</button>
+    <input type="file" id="csvFileInput" style="display: none;" onchange="importFromCsv(event)">
+    <button onclick="document.getElementById('csvFileInput').click()">import</button>
+  </div>
+</div>
+<table id="taskTable" style="autocomplete=off; autocorrect=off; autocapitalize=off; spellcheck=false;">
+  <thead>
+    <tr>
+      <th style="width: 8%;">status<span class="sort-indicator"></span></th>
+      <th style="width: 8%;">domain<span class="sort-indicator"></span></th>
+      <th style="width: 8%;">project<span class="sort-indicator"></span></th>
+      <th>task<span class="sort-indicator"></span></th>
+      <th style="width: 16%;">notes<span class="sort-indicator"></span></th>
+      <th style="width: 10%;">date<span class="sort-indicator"></span></th>
+      <th style="width: 5%;">time<span class="sort-indicator"></span></th>
+      <th style="width: 30px;"></th>
+    </tr>
+  </thead>
+  <tbody id="taskBody">
+    <!-- Table rows will be dynamically added here -->
+  </tbody>
+</table>
+
+<script>
+let currentCell = null;
+
+let sortStates = {};
+
+document.addEventListener('DOMContentLoaded', function() {
+    const headers = document.querySelectorAll('#taskTable th');
+    headers.forEach((header, index) => {
+        sortStates[index] = { order: 'none', priority: -1 };
+        header.addEventListener('click', function() { sortColumn(index); });
+    });
+});
+
+function sortColumn(index) {
+    if (sortStates[index].order === 'none') {
+        Object.keys(sortStates).forEach(key => {
+            sortStates[key].priority = -1;
+        });
+    }
+
+    switch (sortStates[index].order) {
+        case 'none':
+            sortStates[index] = { order: 'asc', priority: 0 };
+            break;
+        case 'asc':
+            sortStates[index] = { order: 'desc', priority: 0 };
+            break;
+        case 'desc':
+            sortStates[index] = { order: 'none', priority: -1 };
+            break;
+    }
+
+    Object.keys(sortStates).forEach(key => {
+        if (parseInt(key) !== index && sortStates[key].priority !== -1) {
+            sortStates[key].priority += 1;
+        }
+    });
+
+    applySorting();
+    updateVisualIndicators();
+}
+
+const statusPrecedence = {
+    "urgent": 6,
+    "now": 5,
+    "today": 4,
+    "": 3,
+    "later": 2,
+    "done": 1
+};
+
+function getStatusPrecedence(value) {
+    const normalizedValue = value.toLowerCase().replace(/[^a-z]/g, '');
+    return statusPrecedence[normalizedValue] || 0;
+}
+
+function applySorting() {
+    const statusIndex = 0;
+    const statusPrecedence = {
+        "urgent": 6,
+        "now": 5,
+        "today": 4,
+        "": 3,
+        "later": 2,
+        "done": 1
+    };
+
+    function getStatusPrecedenceValue(status) {
+        const normalizedStatus = status.toLowerCase().trim();
+        return statusPrecedence[normalizedStatus] || 0;
+    }
+
+    const rows = Array.from(document.querySelector('#taskTable tbody').rows);
+    rows.sort((a, b) => {
+        for (let key of Object.keys(sortStates).sort((a, b) => sortStates[a].priority - sortStates[b].priority)) {
+            if (sortStates[key].order !== 'none') {
+                if (parseInt(key) === statusIndex) {
+                    const precedenceA = getStatusPrecedenceValue(a.cells[statusIndex].textContent);
+                    const precedenceB = getStatusPrecedenceValue(b.cells[statusIndex].textContent);
+                    if (precedenceA !== precedenceB) {
+                        return sortStates[key].order === 'asc' ? precedenceA - precedenceB : precedenceB - precedenceA;
+                    }
+                } else {
+                    const valA = a.cells[key].textContent.trim().toLowerCase();
+                    const valB = b.cells[key].textContent.trim().toLowerCase();
+                    const comparison = valA.localeCompare(valB);
+                    if (valA !== valB) {
+                        return sortStates[key].order === 'asc' ? comparison : -comparison;
+                    }
+                }
+            }
+        }
+        return 0;
+    });
+
+    rows.forEach(row => document.querySelector('#taskTable tbody').appendChild(row));
+}
+
+
+function updateVisualIndicators() {
+    const headers = document.querySelectorAll('#taskTable th');
+    headers.forEach((header, index) => {
+        const indicator = header.querySelector('span');
+        switch (sortStates[index].order) {
+            case 'asc':
+                indicator.textContent = ' ↓';
+                break;
+            case 'desc':
+                indicator.textContent = ' ↑';
+                break;
+            default:
+                indicator.textContent = '';
+                break;
+        }
+    });
+}
+
+const noop = e => {
+  e.preventDefault();
+  e.stopPropagation();
+}
+
+const toBase64 = blob => new Promise(resolve => {
+  const reader = new FileReader();
+  reader.onloadend = () => resolve(reader.result);
+  reader.readAsDataURL(blob);
+})
+
+const tableBody = document.getElementById("taskBody");
+const searchInput = document.getElementById("search");
+
+searchInput.addEventListener("input", searchTasks);
+document.addEventListener("keydown", handleKeyDown);
+
+function addRow() {
+  const newTask = ["", "", "", "", "", "", ""];
+  const row = document.createElement("tr");
+  newTask.forEach((cellValue, colIndex) => {
+    const cell = document.createElement("td");
+    cell.textContent = cellValue;
+    cell.contentEditable = true;
+    cell.addEventListener("blur", handleCellBlur);
+    cell.addEventListener("click", () => currentCell = cell);
+    row.appendChild(cell);
+  });
+
+  const removeCell = document.createElement("td");
+  removeCell.classList.add("remove-btn");
+  removeCell.textContent = "-";
+  removeCell.addEventListener("click", () => {
+    if (isRowEmpty(row)) {
+      removeRow(row);
+    }
+  });
+  row.appendChild(removeCell);
+
+  const firstEmptyStatusRow = findFirstRowBelowStatus("today");
+  if (firstEmptyStatusRow) {
+    tableBody.insertBefore(row, firstEmptyStatusRow);
+  } else {
+    tableBody.appendChild(row);
+  }
+}
+
+function handleCellBlur() {
+  updateRowStatus(this.parentNode);
+  styleAndSortTable();
+}
+
+function updateRowStatus(row) {
+  const statusCell = row.cells[0];
+  const status = statusCell.textContent.toLowerCase();
+  const timeCell = row.cells[5];
+
+  row.classList.remove("done", "now", "today", "later", "urgent");
+
+  if (status.includes("done")) {
+    row.classList.add("done");
+    if (timeCell.textContent === "") {
+      const timestamp = new Date().toLocaleString([], { dateStyle: 'short' });
+      timeCell.textContent = timestamp;
+    }
+  } else if (status.includes("now")) {
+    row.classList.add("now");
+  } else if (status.includes("today")) {
+    row.classList.add("today");
+  } else if (status.includes("later")) {
+    row.classList.add("later");
+  } else if (status.includes("urgent")) {
+    row.classList.add("urgent");
+  }
+}
+
+function styleAndSortTable() {
+  const rows = Array.from(tableBody.getElementsByTagName("tr"));
+  rows.forEach(row => {
+    if (!row.cells[0].textContent.toLowerCase().includes("done")) {
+      updateRowStatus(row);
+    }
+  });
+  sortTable();
+}
+
+function isRowEmpty(row) {
+  for (let i = 0; i < row.cells.length - 1; i++) {
+    if (row.cells[i].textContent.trim() !== "") {
+      return false;
+    }
+  }
+  return true;
+}
+
+function removeRow(row) {
+  tableBody.removeChild(row);
+}
+
+function findFirstRowBelowStatus(status) {
+  const rows = Array.from(tableBody.getElementsByTagName("tr"));
+  return rows.find(row => {
+    const rowStatus = row.cells[0].textContent.toLowerCase();
+    return rowStatus === "" || rowStatus.includes("later") || rowStatus.includes("done");
+  });
+}
+
+function sortTable() {
+  const rows = Array.from(tableBody.getElementsByTagName("tr"));
+  rows.sort((a, b) => {
+    const statusA = a.cells[0].textContent.toLowerCase();
+    const statusB = b.cells[0].textContent.toLowerCase();
+
+    if (statusA === statusB) {
+      return 0;
+    } else if (statusA.includes("urgent") && !statusB.includes("urgent")) {
+      return -1;
+    } else if (!statusA.includes("urgent") && statusB.includes("urgent")) {
+      return 1;
+    } else if (statusA.includes("now") && !statusB.includes("now")) {
+      return -1;
+    } else if (!statusA.includes("now") && statusB.includes("now")) {
+      return 1;
+    } else if (statusA.includes("today") && !statusB.includes("today")) {
+      return -1;
+    } else if (!statusA.includes("today") && statusB.includes("today")) {
+      return 1;
+    } else if (statusA === "" && statusB !== "") {
+      return -1;
+    } else if (statusA !== "" && statusB === "") {
+      return 1;
+    } else if (statusA.includes("later") && !statusB.includes("later")) {
+      return -1;
+    } else if (!statusA.includes("later") && statusB.includes("later")) {
+      return 1;
+    } else if (statusA.includes("done") && !statusB.includes("done")) {
+      return 1;
+    } else if (!statusA.includes("done") && statusB.includes("done")) {
+      return -1;
+    }
+
+    return 0;
+  });
+
+  rows.forEach(row => tableBody.appendChild(row));
+}
+
+function searchTasks() {
+  const searchTerm = searchInput.value;
+  const rows = tableBody.getElementsByTagName("tr");
+  let matchFound = false;
+
+  for (let i = 0; i < rows.length; i++) {
+    const cells = rows[i].getElementsByTagName("td");
+    const queryTerms = searchTerm.split(/\s*&\s*/).map(term => term.trim());
+    let match = queryTerms.every(term => evaluateTerm(cells, term));
+
+    rows[i].style.display = match ? "" : "none";
+    if (match) {
+      matchFound = true;
+    }
+  }
+
+  const searchContainer = document.getElementById("search-container");
+  if (matchFound) {
+    searchContainer.classList.remove("no-results");
+  } else {
+    searchContainer.classList.add("no-results");
+  }
+}
+
+
+
+
+function evaluateTerm(cells, term) {
+  if (term.startsWith("[") && term.endsWith("]")) {
+    const subTerms = term.slice(1, -1).split(/\s*\|\s*/).map(subTerm => subTerm.trim());
+    return subTerms.some(subTerm => evaluateSubTerm(cells, subTerm));
+  } else {
+    return evaluateSubTerm(cells, term);
+  }
+}
+
+function evaluateSubTerm(cells, subTerm) {
+  const dateComparisonRegex = /^(on|after|before):(.*)/;
+  const match = subTerm.match(dateComparisonRegex);
+
+  if (match) {
+    const operator = match[1];
+    const value = match[2].trim();
+    return evaluateDateCondition(cells[5].textContent, operator, value);
+  } else if (subTerm.includes(":")) {
+    const [columnName, value] = subTerm.split(":");
+    const columnIndex = getColumnIndex(columnName.trim());
+    if (columnIndex !== -1) {
+      return cellContainsText(cells[columnIndex], value.trim(), /^['"].*['"]$/.test(value));
+    }
+  } else {
+    return rowContainsText(cells, subTerm.trim(), /^['"].*['"]$/.test(subTerm));
+  }
+}
+
+function evaluateDateCondition(cellDate, operator, searchDate) {
+  const cellDateObj = new Date(cellDate);
+  const searchDateObj = new Date(searchDate);
+
+  if (isNaN(cellDateObj.getTime()) || isNaN(searchDateObj.getTime())) {
+    return false;
+  }
+
+  switch (operator) {
+    case "on":
+      return cellDateObj.toDateString() === searchDateObj.toDateString();
+    case "after":
+      return cellDateObj > searchDateObj;
+    case "before":
+      return cellDateObj < searchDateObj;
+    default:
+      return false;
+  }
+}
+
+
+function cellContainsText(cell, searchTerm, exactMatch) {
+  const cleanedSearchTerm = searchTerm.replace(/^['"]|['"]$/g, "");
+  if (exactMatch) {
+    return cell.textContent === cleanedSearchTerm;
+  } else {
+    return cell.textContent.toLowerCase().includes(cleanedSearchTerm.toLowerCase());
+  }
+}
+
+function rowContainsText(cells, searchTerm, exactMatch) {
+  for (let i = 0; i < cells.length - 1; i++) {
+    if (cellContainsText(cells[i], searchTerm, exactMatch)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function getColumnIndex(columnName) {
+  const headers = document.querySelectorAll("th");
+  for (let i = 0; i < headers.length; i++) {
+    if (headers[i].textContent.toLowerCase() === columnName.toLowerCase()) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+function saveHtml() {
+  const html = document.documentElement.outerHTML;
+  download(html, "task_manager.html", "text/html");
+}
+
+function exportToCsv() {
+  const rows = tableBody.getElementsByTagName("tr");
+  let csvContent = "data:text/csv;charset=utf-8,";
+
+  const headers = Array.from(document.querySelectorAll("th")).map(header => header.textContent);
+  csvContent += headers.join(",") + "\n";
+
+  for (let i = 0; i < rows.length; i++) {
+    const cells = rows[i].getElementsByTagName("td");
+    const rowData = [];
+    for (let j = 0; j < cells.length - 1; j++) {
+      rowData.push(cells[j].textContent);
+    }
+    csvContent += rowData.join(",") + "\n";
+  }
+
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", "task_manager.csv");
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function importFromCsv(event) {
+  const file = event.target.files[0];
+  const reader = new FileReader();
+
+  reader.onload = function (e) {
+    const csvData = e.target.result;
+    const rows = csvData.split("\n");
+    tableBody.innerHTML = "";
+
+    for (let i = 1; i < rows.length; i++) {
+      const rowData = rows[i].split(",");
+      if (rowData.length === 1 && rowData[0] === "") continue;
+
+      const row = document.createElement("tr");
+      rowData.forEach((cellValue, colIndex) => {
+        const cell = document.createElement("td");
+        cell.textContent = cellValue;
+        cell.contentEditable = true;
+        cell.addEventListener("blur", handleCellBlur);
+        cell.addEventListener("click", () => currentCell = cell);
+        row.appendChild(cell);
+      });
+
+      const removeCell = document.createElement("td");
+      removeCell.classList.add("remove-btn");
+      removeCell.textContent = "-";
+      removeCell.addEventListener("click", () => {
+        if (isRowEmpty(row)) {
+          removeRow(row);
+        }
+      });
+      row.appendChild(removeCell);
+
+      tableBody.appendChild(row);
+      updateRowStatus(row);
+    }
+
+    styleAndSortTable();
+  };
+
+  reader.readAsText(file);
+}
+
+function download(content, fileName, contentType) {
+  const a = document.createElement("a");
+  const file = new Blob([content], { type: contentType });
+  a.href = URL.createObjectURL(file);
+  a.download = fileName;
+  a.click();
+}
+
+function initTable() {
+  const rows = tableBody.getElementsByTagName("tr");
+  for (let i = 0; i < rows.length; i++) {
+    const cells = rows[i].getElementsByTagName("td");
+    for (let j = 0; j < cells.length; j++) {
+      cells[j].addEventListener("blur", handleCellBlur);
+      cells[j].addEventListener("click", () => currentCell = cells[j]);
+    }
+    const removeCell = cells[cells.length - 1];
+    removeCell.addEventListener("click", () => {
+      removeRow(rows[i]);
+    });
+  }
+  styleAndSortTable();
+}
+
+function handleKeyDown(event) {
+  if (event.key === "Escape" && currentCell) {
+    currentCell.blur();
+    currentCell = null;
+  } else if (event.ctrlKey && event.code === "Space") {
+    event.preventDefault();
+    addRow();
+  }
+}
+
+window.addEventListener("load", initTable);
+</script>
+</body>
