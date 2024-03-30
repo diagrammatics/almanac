@@ -5,7 +5,7 @@ a searchable, sortable task manager contained in a single self-contained HTML fi
 
 ## problem/note from the editor
 
-I love airtable and sheets. The customizability and feature set are endless bounties of (band pass filtered) "end-user programming". What I dislike is they are incredibly complex pieces of software and extremely opaque as to their internal function. This is a (very) simple proof of concept around whether or not it may be able to replace some of those system with very small simple, portable, webapps. I apologize in advance for the use of a browser to enable this software.
+I love airtable and sheets. The customizability and feature set are endless bounties of (band pass filtered) "end-user programming". What I dislike is they are incredibly complex pieces of software and extremely opaque as to their internal function. This is a (very) simple proof of concept around whether or not I may be able to replace some of those systems with very small simple, portable, webapps. I apologize in advance for the use of a browser to enable this software.
 
 ## overview
 Almanac is an experiment in simplicity: a task manager that lives entirely within a single HTML file. It can be used offline, modified, and shared with ease. The project draws inspiration from Cristóbal Sciutto Rodríguez's exploratory approach to note-taking (see [cristobal.space/note](https://cristobal.space/note)) and Kartik Agaram's thoughts on keeping individual apps simple to encourage forks and remixes ([akkartik.name/freewheeling-apps](https://akkartik.name/freewheeling-apps)). The aim here is to explore how we may be able to mobilize under the ethos that simpler can often be better, and that large apps may be less empowering than small ones.
@@ -13,7 +13,7 @@ Almanac is an experiment in simplicity: a task manager that lives entirely withi
 ## features
 
 ### simple structure
-Tasks are organized across several columns such as status, domain, project, task, notes, date, and time. This structure is designed to be intuitive, making the management and prioritization of tasks straightforward.
+Tasks are organized across several columns such as status, domain, project, task, notes, date, and time. This structure is designed to be intuitive, making the management and prioritization of tasks straightforward. These columns can be modified with a 1/4 cup lemon juice and esprits de corps.
 
 ### sorting and searching
 Columns can be sorted with a click, and Almanac supports a basic but powerful search grammar for filtering tasks. This includes precise matching and the ability to combine or exclude terms.
