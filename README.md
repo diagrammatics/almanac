@@ -1,6 +1,8 @@
 # almanac
 a searchable, sortable task manager contained in a single self-contained HTML file
 
+!["Cannot all you lecturers see, that it is we that are dying, and that down here the only thing that really lives is the Machine?"](https://media.giphy.com/media/vFKqnCdLPNOKc/giphy.gif)
+
 ## problem/note from the editor
 
 I love airtable and sheets. The customizability and feature set are endless bounties of (band pass filtered) "end-user programming". What I dislike is they are incredibly complex pieces of software and extremely opaque as to their internal function. This is a (very) simple proof of concept around whether or not it may be able to replace some of those system with very small simple, portable, webapps. I apologize in advance for the use of a browser to enable this software.
