@@ -28,7 +28,7 @@ Being a single HTML file, Almanac is inherently portable and fully functional of
 To add a task, simply click the "add" button (or use ctrl+space) and start typing. Editing is as direct: click on a task to make changes. Tab and shift+tab cycle through fields. Remember, to delete a task, first clear its text, and then click on the red "-" on the right side of the relevant row.
 
 ### sorting
-Click on any column header to sort tasks by that column, cycling alphabetically descending then ascending/reverse order. It helps to use a time format that sorts numerically, such as [ISO 8601](https://en.wikipedia.org/wiki/ISO_8601) so that temporal sorting is straightforward.
+Click on any column header to sort tasks by that column, cycling alphabetically descending then ascending/reverse order. It helps to use a time format that sorts numerically, such as [ISO 8601](https://en.wikipedia.org/wiki/ISO_8601) so that temporal sorting is straightforward. A small note: for now, this uses a custom sorting on the status field (urgent, now, today, "empty", later, done), but this can be modified with a little baking soda and a small cheese knife.
 
 ### searching
 Use the search bar to filter tasks. You can search by any text or match the contents of specific fields, even searching time ranges in the date field, or building up searches with logic.
