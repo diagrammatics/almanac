@@ -20,15 +20,15 @@ th, td {
   padding: 8px;
   text-align: left;
   word-wrap: break-word;
-  position: relative; /* Added for positioning sort indicators */
+  position: relative;
 }
 
 .sort-indicator {
   position: absolute;
-  right: 8px; /* Adjust as needed */
+  right: 8px;
   top: 50%;
   transform: translateY(-50%);
-  user-select: none; /* Prevents text selection */
+  user-select: none;
 }
 
 th {
@@ -46,6 +46,7 @@ th span {
   border: 1px solid black;
   border-radius: 0;
   font-size: 14px;
+  line-height: 1;
 }
 
 #search-container.no-results::before {
@@ -114,10 +115,12 @@ th span {
   border-radius: 5px;
   background-color: white;
   color: black;
-  font-size: 14px;
+  font-size: 16px;
   font-family: Karla, sans-serif;
   cursor: pointer;
   margin-right: 1em;
+  line-height: 1;
+  box-sizing: border-box;
 }
 
 th:last-child,
@@ -132,18 +135,25 @@ td:nth-last-child(2) {
 </style>
 </head>
 
-<div style="margin-left: 2em; position: relative;">
-  <div id="search-container" style="position: relative; display: inline-block;">
-    <input type="text" id="search" placeholder="search..." style="font-family: Karla, sans-serif; padding-left: 15px; width: 300px;">
-  </div>
-  <div class="button-container">
-    <button onclick="addRow()">add</button>
-    <button onclick="saveHtml()">save</button>
-    <button onclick="exportToCsv()">export</button>
-    <input type="file" id="csvFileInput" style="display: none;" onchange="importFromCsv(event)">
-    <button onclick="document.getElementById('csvFileInput').click()">import</button>
-  </div>
+<div style="display: flex; justify-content: space-between; align-items: center; margin: 0 2em;">
+	<div>
+		<div id="search-container" style="position: relative; display: inline-block;">
+			<input type="text" id="search" placeholder="search..." style="font-family: Karla, sans-serif; padding-left: 15px; width: 300px;">
+	</div>
+	<div class="button-container">
+		<button onclick="addRow()">add</button>
+		<button onclick="saveHtml()">save</button>
+		<button onclick="exportToCsv()">export</button>
+		<input type="file" id="csvFileInput" style="display: none;" onchange="importFromCsv(event)">
+		<button onclick="document.getElementById('csvFileInput').click()">import</button>
+	</div>
+	<div class="button-container" style="position: absolute; right: 0.67em;">
+		<button id="toggleCurrentYear" onclick="toggleCurrentYearVisibility()">◻ !year</button>
+		<button id="toggleDoneTasks" onclick="toggleDoneTasksVisibility()">◻ !done</button>
+	</div>
 </div>
+</div>
+
 <table id="taskTable" style="autocomplete=off; autocorrect=off; autocapitalize=off; spellcheck=false;">
   <thead>
     <tr>
@@ -154,7 +164,8 @@ td:nth-last-child(2) {
       <th style="width: 16%;">notes<span class="sort-indicator"></span></th>
       <th style="width: 10%;">date<span class="sort-indicator"></span></th>
       <th style="width: 5%;">time<span class="sort-indicator"></span></th>
-      <th style="width: 30px;"></th>
+      <th style="width: 3%;">dur<span class="sort-indicator"></span></th>
+      <th style="width: 30px; font-size:smaller; text-align: center;">❌</th>
     </tr>
   </thead>
   <tbody id="taskBody">
@@ -173,7 +184,10 @@ document.addEventListener('DOMContentLoaded', function() {
         sortStates[index] = { order: 'none', priority: -1 };
         header.addEventListener('click', function() { sortColumn(index); });
     });
+
+    applyAllToggles();
 });
+
 
 function sortColumn(index) {
     if (sortStates[index].order === 'none') {
@@ -297,7 +311,7 @@ searchInput.addEventListener("input", searchTasks);
 document.addEventListener("keydown", handleKeyDown);
 
 function addRow() {
-  const newTask = ["", "", "", "", "", "", ""];
+  const newTask = ["", "", "", "", "", "", "", ""];
   const row = document.createElement("tr");
   newTask.forEach((cellValue, colIndex) => {
     const cell = document.createElement("td");
@@ -450,8 +464,51 @@ function searchTasks() {
   }
 }
 
+let toggleStates = {
+    year: false,
+    done: false
+};
 
+function applyAllToggles() {
+    const currentYear = new Date().getFullYear().toString();
+    const nextYear = (new Date().getFullYear() + 1).toString();
+    const rows = document.querySelectorAll("#taskTable tbody tr");
 
+    rows.forEach(row => {
+        let showRow = true;
+
+        const dateCellText = row.cells[5].textContent.trim();
+        const statusCellText = row.cells[0].textContent.trim().toLowerCase();
+
+        if (toggleStates.year && dateCellText) {
+            const rowYear = new Date(dateCellText).getFullYear().toString();
+            const isNextYearText = dateCellText === nextYear;
+            if (rowYear === nextYear || isNextYearText) {
+                showRow = false;
+            }
+        }
+
+        if (toggleStates.done && statusCellText.includes("done")) {
+            showRow = false;
+        }
+
+        row.style.display = showRow ? "" : "none";
+    });
+}
+
+function toggleCurrentYearVisibility() {
+    const button = document.getElementById("toggleCurrentYear");
+    toggleStates.year = !toggleStates.year;
+    button.textContent = toggleStates.year ? "◼ !year" : "◻ !year";
+    applyAllToggles();
+}
+
+function toggleDoneTasksVisibility() {
+    const button = document.getElementById("toggleDoneTasks");
+    toggleStates.done = !toggleStates.done;
+    button.textContent = toggleStates.done ? "◼ !done" : "◻ !done";
+    applyAllToggles();
+}
 
 function evaluateTerm(cells, term) {
   if (term.startsWith("[") && term.endsWith("]")) {
@@ -532,8 +589,11 @@ function getColumnIndex(columnName) {
 
 function saveHtml() {
   const html = document.documentElement.outerHTML;
-  download(html, "task_manager.html", "text/html");
+  const timestamp = new Date().toISOString().slice(2, 16).replace(/T/, ' ').replace(/:/, '');
+  const filename = `almanac ${timestamp}.html`;
+  download(html, filename, "text/html");
 }
+
 
 function exportToCsv() {
   const rows = tableBody.getElementsByTagName("tr");
@@ -546,19 +606,23 @@ function exportToCsv() {
     const cells = rows[i].getElementsByTagName("td");
     const rowData = [];
     for (let j = 0; j < cells.length - 1; j++) {
-      rowData.push(cells[j].textContent);
+      rowData.push(`"${cells[j].textContent}"`);
     }
     csvContent += rowData.join(",") + "\n";
   }
 
+  const timestamp = new Date().toISOString().slice(2, 16).replace(/T/, ' ').replace(/:/, '');
+  const filename = `tasks ${timestamp}.csv`;
+
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement("a");
   link.setAttribute("href", encodedUri);
-  link.setAttribute("download", "task_manager.csv");
+  link.setAttribute("download", filename);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
 }
+
 
 function importFromCsv(event) {
   const file = event.target.files[0];
@@ -636,6 +700,7 @@ function handleKeyDown(event) {
     addRow();
   }
 }
+
 
 window.addEventListener("load", initTable);
 </script>
