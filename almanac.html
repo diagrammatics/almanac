@@ -1,6 +1,12 @@
 <head>
 <meta charset="UTF-8">
 <style>
+
+html, body {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
 body {
   font-family: Karla, sans-serif;
   background-color: #f5f3ef;
@@ -67,7 +73,6 @@ th span {
 
 .done td {
   color: #888888;
-  font-weight: bold;
 }
 
 .now {
@@ -132,6 +137,11 @@ th:nth-last-child(2),
 td:nth-last-child(2) {
   width: calc(100% - 30px - 55%);
 }
+
+.date, .time, .dur {
+  font-size: 18px;
+}
+
 </style>
 </head>
 
@@ -157,13 +167,13 @@ td:nth-last-child(2) {
 <table id="taskTable" style="autocomplete=off; autocorrect=off; autocapitalize=off; spellcheck=false;">
   <thead>
     <tr>
-      <th style="width: 8%;">status<span class="sort-indicator"></span></th>
-      <th style="width: 8%;">domain<span class="sort-indicator"></span></th>
-      <th style="width: 8%;">project<span class="sort-indicator"></span></th>
+      <th style="width: 5%;">status<span class="sort-indicator"></span8:33 AM 4/3/2024></th>
+      <th style="width: 4%;">dom<span class="sort-indicator"></span></th>
+      <th style="width: 6%;">project<span class="sort-indicator"></span></th>
       <th>task<span class="sort-indicator"></span></th>
-      <th style="width: 16%;">notes<span class="sort-indicator"></span></th>
-      <th style="width: 10%;">date<span class="sort-indicator"></span></th>
-      <th style="width: 5%;">time<span class="sort-indicator"></span></th>
+      <th style="width: 20%;">notes<span class="sort-indicator"></span></th>
+      <th style="width: 6%;">date<span class="sort-indicator"></span></th>
+      <th style="width: 4%;">time<span class="sort-indicator"></span></th>
       <th style="width: 3%;">dur<span class="sort-indicator"></span></th>
       <th style="width: 30px; font-size:smaller; text-align: center;">❌</th>
     </tr>
@@ -178,7 +188,40 @@ let currentCell = null;
 
 let sortStates = {};
 
+function setupDragAndDrop() {
+    // Prevent default drag behaviors globally
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        document.body.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, stopPropagation, false);
+    });
+
+    // Handle the drop
+    document.body.addEventListener('drop', handleDrop, false);
+}
+
+function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+}
+
+function stopPropagation(e) {
+    e.stopPropagation();
+}
+
+function handleDrop(e) {
+    var dt = e.dataTransfer;
+    var files = dt.files;
+
+    // Check if any files were dropped
+    if (files.length) {
+        // Assuming your existing importFromCsv function expects an event with a target containing files
+        var eventMock = { target: { files: files } };
+        importFromCsv(eventMock); // Call your existing function
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    setupDragAndDrop();
     const headers = document.querySelectorAll('#taskTable th');
     headers.forEach((header, index) => {
         sortStates[index] = { order: 'none', priority: -1 };
@@ -311,34 +354,36 @@ searchInput.addEventListener("input", searchTasks);
 document.addEventListener("keydown", handleKeyDown);
 
 function addRow() {
-  const newTask = ["", "", "", "", "", "", "", ""];
-  const row = document.createElement("tr");
-  newTask.forEach((cellValue, colIndex) => {
-    const cell = document.createElement("td");
-    cell.textContent = cellValue;
-    cell.contentEditable = true;
-    cell.addEventListener("blur", handleCellBlur);
-    cell.addEventListener("click", () => currentCell = cell);
-    row.appendChild(cell);
-  });
-
-  const removeCell = document.createElement("td");
-  removeCell.classList.add("remove-btn");
-  removeCell.textContent = "-";
-  removeCell.addEventListener("click", () => {
-    if (isRowEmpty(row)) {
-      removeRow(row);
+    const newRow = document.createElement("tr");
+    const cellsData = ["", "", "", "", "", "", "", ""];
+    const columnNames = ["status", "domain", "project", "task", "notes", "date", "time", "dur"];
+    cellsData.forEach((cellData, index) => {
+        const cell = document.createElement("td");
+        cell.textContent = cellData;
+        cell.contentEditable = true;
+        cell.addEventListener("blur", handleCellBlur);
+        cell.addEventListener("click", () => currentCell = cell);
+        cell.classList.add(columnNames[index]);
+        newRow.appendChild(cell);
+    });
+    const removeCell = document.createElement("td");
+    removeCell.classList.add("remove-btn");
+    removeCell.textContent = "-";
+    removeCell.addEventListener("click", () => {
+        if (isRowEmpty(newRow)) {
+            removeRow(newRow);
+        }
+    });
+    newRow.appendChild(removeCell);
+    const firstEmptyStatusRow = findFirstRowBelowStatus("today");
+    if (firstEmptyStatusRow) {
+        tableBody.insertBefore(newRow, firstEmptyStatusRow);
+    } else {
+        tableBody.appendChild(newRow);
     }
-  });
-  row.appendChild(removeCell);
-
-  const firstEmptyStatusRow = findFirstRowBelowStatus("today");
-  if (firstEmptyStatusRow) {
-    tableBody.insertBefore(row, firstEmptyStatusRow);
-  } else {
-    tableBody.appendChild(row);
-  }
+   calculate();
 }
+
 
 function handleCellBlur() {
   updateRowStatus(this.parentNode);
@@ -369,15 +414,42 @@ function updateRowStatus(row) {
   }
 }
 
-function styleAndSortTable() {
-  const rows = Array.from(tableBody.getElementsByTagName("tr"));
+function updateStatusForToday() {
+  const today = new Date().toLocaleDateString([], {year: 'numeric', month: '2-digit', day: '2-digit'});
+  const rows = document.querySelectorAll("#taskTable tbody tr");
+
   rows.forEach(row => {
-    if (!row.cells[0].textContent.toLowerCase().includes("done")) {
-      updateRowStatus(row);
+    const dateCell = row.cells[5]; // Assuming the date is in the 6th column
+    const statusCell = row.cells[0]; // Assuming the status is in the 1st column
+
+    if (dateCell.textContent.trim() === today) {
+      statusCell.textContent = "today";
+      row.classList.add("today"); // Apply "today" class styling if needed
     }
   });
-  sortTable();
 }
+
+
+function styleAndSortTable() {
+    const columnNames = ["status", "domain", "project", "task", "notes", "date", "time", "dur"]; // Define column names for class assignments
+
+    const rows = Array.from(tableBody.getElementsByTagName("tr"));
+    rows.forEach(row => {
+        // Iterate over each cell in the row
+        Array.from(row.cells).forEach((cell, index) => {
+            if (index < columnNames.length) { // Ensure index is within the range of defined column names
+                cell.classList.add(columnNames[index]); // Apply class based on column index
+            }
+        });
+
+        if (!row.cells[0].textContent.toLowerCase().includes("done")) {
+            updateRowStatus(row);
+        }
+    });
+
+    sortTable(); // Apply sorting logic
+}
+
 
 function isRowEmpty(row) {
   for (let i = 0; i < row.cells.length - 1; i++) {
