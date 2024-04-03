@@ -189,13 +189,11 @@ let currentCell = null;
 let sortStates = {};
 
 function setupDragAndDrop() {
-    // Prevent default drag behaviors globally
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
         document.body.addEventListener(eventName, preventDefaults, false);
         document.body.addEventListener(eventName, stopPropagation, false);
     });
 
-    // Handle the drop
     document.body.addEventListener('drop', handleDrop, false);
 }
 
@@ -212,11 +210,9 @@ function handleDrop(e) {
     var dt = e.dataTransfer;
     var files = dt.files;
 
-    // Check if any files were dropped
     if (files.length) {
-        // Assuming your existing importFromCsv function expects an event with a target containing files
         var eventMock = { target: { files: files } };
-        importFromCsv(eventMock); // Call your existing function
+        importFromCsv(eventMock);
     }
 }
 
@@ -415,30 +411,46 @@ function updateRowStatus(row) {
 }
 
 function updateStatusForToday() {
-  const today = new Date().toLocaleDateString([], {year: 'numeric', month: '2-digit', day: '2-digit'});
+  const today = new Date();
+  const formattedTodayWithDashes = today.getFullYear().toString().slice(-2) + "-" + 
+                                   ('0' + (today.getMonth() + 1)).slice(-2) + "-" + 
+                                   ('0' + today.getDate()).slice(-2);
+  const formattedTodayWithSlashes = ('0' + (today.getMonth() + 1)).slice(-2) + "/" + 
+                                    ('0' + today.getDate()).slice(-2) + "/" + 
+                                    today.getFullYear().toString();
+
   const rows = document.querySelectorAll("#taskTable tbody tr");
 
   rows.forEach(row => {
-    const dateCell = row.cells[5]; // Assuming the date is in the 6th column
-    const statusCell = row.cells[0]; // Assuming the status is in the 1st column
+    const dateCell = row.cells[5];
+    const statusCell = row.cells[0];
+    let dateText = dateCell.textContent.trim();
+    let statusText = statusCell.textContent.trim().toLowerCase();
 
-    if (dateCell.textContent.trim() === today) {
+    let todayDateToCompare;
+    if (dateText.includes("-")) {
+      todayDateToCompare = formattedTodayWithDashes;
+    } else if (dateText.includes("/")) {
+      todayDateToCompare = formattedTodayWithSlashes;
+    }
+
+    if (dateText === todayDateToCompare && statusText !== "urgent" && statusText !== "now" && statusText !== "done") {
       statusCell.textContent = "today";
-      row.classList.add("today"); // Apply "today" class styling if needed
+      row.classList.add("today");
+      row.classList.remove("done", "later", "urgent", "now");
     }
   });
 }
 
 
 function styleAndSortTable() {
-    const columnNames = ["status", "domain", "project", "task", "notes", "date", "time", "dur"]; // Define column names for class assignments
+    const columnNames = ["status", "domain", "project", "task", "notes", "date", "time", "dur"];
 
     const rows = Array.from(tableBody.getElementsByTagName("tr"));
     rows.forEach(row => {
-        // Iterate over each cell in the row
         Array.from(row.cells).forEach((cell, index) => {
-            if (index < columnNames.length) { // Ensure index is within the range of defined column names
-                cell.classList.add(columnNames[index]); // Apply class based on column index
+            if (index < columnNames.length) {
+                cell.classList.add(columnNames[index]);
             }
         });
 
@@ -447,7 +459,7 @@ function styleAndSortTable() {
         }
     });
 
-    sortTable(); // Apply sorting logic
+    sortTable();
 }
 
 
@@ -732,7 +744,7 @@ function importFromCsv(event) {
       tableBody.appendChild(row);
       updateRowStatus(row);
     }
-
+    calculate();
     styleAndSortTable();
   };
 
@@ -764,13 +776,22 @@ function initTable() {
 }
 
 function handleKeyDown(event) {
-  if (event.key === "Escape" && currentCell) {
-    currentCell.blur();
-    currentCell = null;
+  if (event.key === "Escape") {
+    if (currentCell) {
+      currentCell.blur();
+      currentCell = null;
+    }
+    calculate();
   } else if (event.ctrlKey && event.code === "Space") {
     event.preventDefault();
     addRow();
   }
+}
+
+
+function calculate() {
+    updateStatusForToday();
+    styleAndSortTable();
 }
 
 
