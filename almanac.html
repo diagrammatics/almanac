@@ -606,7 +606,7 @@ function exportToCsv() {
     const cells = rows[i].getElementsByTagName("td");
     const rowData = [];
     for (let j = 0; j < cells.length - 1; j++) {
-      rowData.push(`"${cells[j].textContent}"`);
+      rowData.push(cells[j].textContent);
     }
     csvContent += rowData.join(",") + "\n";
   }
