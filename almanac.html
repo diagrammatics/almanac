@@ -2,6 +2,10 @@
 <meta charset="UTF-8">
 <style>
 
+html {
+  overflow-y: scroll;
+}
+
 html, body {
   overflow-x: hidden;
   max-width: 100%;
@@ -91,6 +95,10 @@ th span {
   background-color: #c696e866;
 }
 
+.sched {
+  background-color: #ffffe0;
+}
+
 .urgent {
   background-color: #f2786888;
 }
@@ -117,7 +125,7 @@ th span {
 .button-container button {
   padding: 6px 12px;
   border: 1px solid black;
-  border-radius: 5px;
+  border-radius: 10px;
   background-color: white;
   color: black;
   font-size: 16px;
@@ -158,8 +166,10 @@ td:nth-last-child(2) {
 		<button onclick="document.getElementById('csvFileInput').click()">import</button>
 	</div>
 	<div class="button-container" style="position: absolute; right: 0.67em;">
-		<button id="toggleCurrentYear" onclick="toggleCurrentYearVisibility()">◻ !year</button>
-		<button id="toggleDoneTasks" onclick="toggleDoneTasksVisibility()">◻ !done</button>
+		<button id="toggleAgenda">◻ agenda</button> 
+		<button id="toggleSchedTasks">◻ sched</button>
+		<button id="toggleCurrentYear">◻ !year</button>
+		<button id="toggleDoneTasks">◻ !done</button>
 	</div>
 </div>
 </div>
@@ -170,7 +180,7 @@ td:nth-last-child(2) {
       <th style="width: 5%;">status<span class="sort-indicator"></span8:33 AM 4/3/2024></th>
       <th style="width: 4%;">dom<span class="sort-indicator"></span></th>
       <th style="width: 6%;">project<span class="sort-indicator"></span></th>
-      <th>task<span class="sort-indicator"></span></th>
+      <th style="width: 40%;">task<span class="sort-indicator"></span></th>
       <th style="width: 20%;">notes<span class="sort-indicator"></span></th>
       <th style="width: 6%;">date<span class="sort-indicator"></span></th>
       <th style="width: 4%;">time<span class="sort-indicator"></span></th>
@@ -389,15 +399,29 @@ function handleCellBlur() {
 function updateRowStatus(row) {
   const statusCell = row.cells[0];
   const status = statusCell.textContent.toLowerCase();
-  const timeCell = row.cells[5];
+  const dateCell = row.cells[5];
+  const timeCell = row.cells[6];
 
   row.classList.remove("done", "now", "today", "later", "urgent");
 
   if (status.includes("done")) {
-    row.classList.add("done");
-    if (timeCell.textContent === "") {
-      const timestamp = new Date().toLocaleString([], { dateStyle: 'short' });
-      timeCell.textContent = timestamp;
+    if (!row.classList.contains("done")) {
+      const currentDate = new Date();
+	  const timezoneOffset = -7;
+
+	  const adjustedDate = new Date(currentDate.getTime() + timezoneOffset * 60 * 60 * 1000);
+
+      if (dateCell.textContent === "") {
+        const dateString = adjustedDate.toISOString().slice(2, 10);
+        dateCell.textContent = dateString;
+      }
+      
+      if (timeCell.textContent === "") {
+        const timeString = adjustedDate.toISOString().slice(11, 16);
+        timeCell.textContent = timeString;
+      }
+      
+      row.classList.add("done");
     }
   } else if (status.includes("now")) {
     row.classList.add("now");
@@ -407,8 +431,13 @@ function updateRowStatus(row) {
     row.classList.add("later");
   } else if (status.includes("urgent")) {
     row.classList.add("urgent");
+  } else if (status.includes("sched")) {
+    row.classList.add("sched"); 
   }
 }
+
+
+
 
 function updateStatusForToday() {
   const today = new Date();
@@ -548,51 +577,103 @@ function searchTasks() {
   }
 }
 
-let toggleStates = {
-    year: false,
-    done: false
-};
-
-function applyAllToggles() {
-    const currentYear = new Date().getFullYear().toString();
-    const nextYear = (new Date().getFullYear() + 1).toString();
-    const rows = document.querySelectorAll("#taskTable tbody tr");
-
-    rows.forEach(row => {
-        let showRow = true;
-
-        const dateCellText = row.cells[5].textContent.trim();
-        const statusCellText = row.cells[0].textContent.trim().toLowerCase();
-
-        if (toggleStates.year && dateCellText) {
-            const rowYear = new Date(dateCellText).getFullYear().toString();
-            const isNextYearText = dateCellText === nextYear;
-            if (rowYear === nextYear || isNextYearText) {
-                showRow = false;
+document.addEventListener("DOMContentLoaded", function() {
+   
+    function toggleTaskVisibility(conditionFunction) {
+        const rows = document.querySelectorAll("#taskBody tr");
+        rows.forEach(row => {
+            if (conditionFunction(row)) {
+                row.style.display = "";
+            } else {
+                row.style.display = "none";
             }
-        }
+        });
+    }
 
-        if (toggleStates.done && statusCellText.includes("done")) {
-            showRow = false;
-        }
+	function agendaCondition(row) {
+		const status = row.cells[0].textContent.trim().toLowerCase();
+		const dateText = row.cells[5].textContent.trim();
+		let taskDate;
 
-        row.style.display = showRow ? "" : "none";
+		if (dateText.length === 4) {
+			taskDate = new Date(`${dateText}-01-01`);
+		} else if (dateText.length >= 6) {
+			const year = dateText.substring(0, 2);
+			const month = dateText.substring(3, 5) - 1;
+			const day = dateText.substring(6, 8);
+			const currentYearCentury = new Date().getFullYear().toString().substring(0, 2);
+			taskDate = new Date(`${currentYearCentury}${year}`, month, day);
+		} else {
+			taskDate = new Date(9999, 0, 1);
+		}
+
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+		taskDate.setHours(0, 0, 0, 0);
+		
+		const tenDaysLater = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 10);
+
+		const isWithinNextTenDays = taskDate >= today && taskDate <= tenDaysLater;
+
+		const isUrgentNowToday = status === 'urgent' || status === 'now' || status === 'today';
+
+		return isUrgentNowToday || isWithinNextTenDays;
+	}
+
+    function conditionSched(row) {
+        const status = row.cells[0].textContent.trim().toLowerCase();
+        return status.includes('sched');
+    }
+
+    function conditionNotDone(row) {
+        const status = row.cells[0].textContent.trim().toLowerCase();
+        return !status.includes('done');
+    }
+
+	function conditionNotNextYear(row) {
+		const dateText = row.cells[5].textContent.trim();
+		let rowYear;
+
+		if (dateText.length === 4) {
+			rowYear = parseInt(dateText, 10);
+		} else if (dateText.length === 8) {
+			const rowYearPrefix = new Date().getFullYear().toString().substring(0, 2);
+			rowYear = parseInt(rowYearPrefix + dateText.substring(0, 2), 10);
+		} else {
+			rowYear = new Date().getFullYear();
+		}
+
+		const currentYear = new Date().getFullYear();
+		const nextYear = currentYear + 1;
+
+		return rowYear < nextYear;
+	}
+
+    document.getElementById('toggleAgenda').addEventListener('click', function() {
+        this.classList.toggle('active');
+        toggleTaskVisibility(this.classList.contains('active') ? agendaCondition : () => true);
+        this.textContent = this.classList.contains('active') ? '◼ agenda' : '◻ agenda';
     });
-}
 
-function toggleCurrentYearVisibility() {
-    const button = document.getElementById("toggleCurrentYear");
-    toggleStates.year = !toggleStates.year;
-    button.textContent = toggleStates.year ? "◼ !year" : "◻ !year";
-    applyAllToggles();
-}
+    document.getElementById('toggleSchedTasks').addEventListener('click', function() {
+        this.classList.toggle('active');
+        toggleTaskVisibility(this.classList.contains('active') ? conditionSched : () => true);
+        this.textContent = this.classList.contains('active') ? '◼ sched' : '◻ sched';
+    });
 
-function toggleDoneTasksVisibility() {
-    const button = document.getElementById("toggleDoneTasks");
-    toggleStates.done = !toggleStates.done;
-    button.textContent = toggleStates.done ? "◼ !done" : "◻ !done";
-    applyAllToggles();
-}
+    document.getElementById('toggleDoneTasks').addEventListener('click', function() {
+        this.classList.toggle('active');
+        toggleTaskVisibility(this.classList.contains('active') ? conditionNotDone : () => true);
+        this.textContent = this.classList.contains('active') ? '◼ !done' : '◻ !done';
+    });
+
+    document.getElementById('toggleCurrentYear').addEventListener('click', function() {
+        this.classList.toggle('active');
+        toggleTaskVisibility(this.classList.contains('active') ? conditionNotNextYear : () => true);
+        this.textContent = this.classList.contains('active') ? '◼ !year' : '◻ !year';
+    });
+});
+
 
 function evaluateTerm(cells, term) {
   if (term.startsWith("[") && term.endsWith("]")) {
@@ -680,32 +761,40 @@ function saveHtml() {
 
 
 function exportToCsv() {
-  const rows = tableBody.getElementsByTagName("tr");
-  let csvContent = "data:text/csv;charset=utf-8,";
+    const rows = tableBody.getElementsByTagName("tr");
+    let csvContent = "data:text/csv;charset=utf-8,";
 
-  const headers = Array.from(document.querySelectorAll("th")).map(header => header.textContent);
-  csvContent += headers.join(",") + "\n";
+    const headers = Array.from(document.querySelectorAll("th")).map(header => header.textContent);
+    csvContent += headers.join(",") + "\n";
 
-  for (let i = 0; i < rows.length; i++) {
-    const cells = rows[i].getElementsByTagName("td");
-    const rowData = [];
-    for (let j = 0; j < cells.length - 1; j++) {
-      rowData.push(cells[j].textContent);
+    for (let i = 0; i < rows.length; i++) {
+        const cells = rows[i].getElementsByTagName("td");
+        const rowData = [];
+        for (let j = 0; j < cells.length - 1; j++) {
+            rowData.push(cells[j].textContent.replace(/"/g, '""').replace(/,/g, ';'));
+        }
+        csvContent += rowData.join(",") + "\n";
     }
-    csvContent += rowData.join(",") + "\n";
-  }
 
-  const timestamp = new Date().toISOString().slice(2, 16).replace(/T/, ' ').replace(/:/, '');
-  const filename = `tasks ${timestamp}.csv`;
+      const now = new Date();
+	  const gmtOffset = 0; // GMT-7 in minutes - working weirdly
+	  const localOffset = now.getTimezoneOffset();
+	  const diff = (gmtOffset - localOffset) * 60000;
+	  const gmt7Time = new Date(now.getTime() + diff);
 
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", filename);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+	  const timestamp = gmt7Time.toISOString().slice(2, 16).replace(/T/, ' ').replace(/:/, '');
+    const filename = `tasks ${timestamp}.csv`;
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
+
+
 
 
 function importFromCsv(event) {
@@ -788,8 +877,52 @@ function handleKeyDown(event) {
   }
 }
 
+function setEmojiFavicon(emoji) {
+  const canvas = document.createElement('canvas');
+  canvas.height = 80;
+  canvas.width = 80;
+
+  const ctx = canvas.getContext('2d');
+  ctx.font = '64px serif';
+  ctx.fillText(emoji, 0, 64);
+
+  const link = document.createElement('link');
+  link.rel = 'icon';
+  link.type = 'image/png';
+  link.href = canvas.toDataURL('image/png');
+
+  document.head.appendChild(link);
+}
+
+setEmojiFavicon('🗺️');
+
+function updateSchedRowsToUrgent() {
+    const getFormattedToday = () => {
+        const today = new Date();
+        const dd = String(today.getDate()).padStart(2, '0');
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const yyyy = today.getFullYear().toString().substr(-2);
+        return `${yyyy}-${mm}-${dd}`;
+    };
+
+    const formattedToday = getFormattedToday();
+    const rows = document.querySelectorAll("#taskBody tr");
+
+    rows.forEach(row => {
+        const statusCell = row.cells[0];
+        const dateCell = row.cells[5];
+        const status = statusCell.textContent.toLowerCase().trim();
+
+        if (status.includes("sched") && dateCell.textContent.trim() === formattedToday) {
+            statusCell.textContent = "urgent";
+            updateRowStatus(row);
+        }
+    });
+}
+
 
 function calculate() {
+	updateSchedRowsToUrgent();
     updateStatusForToday();
     styleAndSortTable();
 }
